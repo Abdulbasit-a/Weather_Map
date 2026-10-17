@@ -191,7 +191,8 @@ function renderWeather(lat, lng, weather, placeName) {
   const iconUrl = `https://openweathermap.org/img/wn/${escapeHtml(iconCode)}@2x.png`;
 
   const shareText = `Weather in ${cityName}${country ? ', ' + country : ''}: ${temp}\u00B0C, ${weatherDesc}. Humidity ${humidity}%, Wind ${wind} m/s, Clouds ${clouds}%.`;
-  const fbUrl = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(window.location.href);
+  const fbUrl = 'https://www.facebook.com/sharer/sharer.php?u=' +
+    encodeURIComponent(window.location.href) + '&quote=' + encodeURIComponent(shareText);
 
   const markerIcon = L.divIcon({
     className: 'weather-marker',
