@@ -56,10 +56,10 @@ function initMap() {
   setTimeout(() => map.invalidateSize(), 0);
   window.addEventListener('load', () => map.invalidateSize());
   /* Ensure map renders correctly after resize */
-}
+  }
 }
 
-/* ---------- Loading state ---------- */
+/* Loading and error state helpers */
 function setLoading(isLoading) {
   if (isLoading) {
     spinner.style.display = 'flex';
