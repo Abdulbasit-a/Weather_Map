@@ -7,7 +7,8 @@ centers a map on it, fetches current weather from OpenWeatherMap, and renders th
 interactive map popup (InfoWindow). Built with semantic HTML5, CSS3, and vanilla ES6+ JavaScript.
 
 ## Live Demo
-[GitHub Pages link] — replace with your deployed URL after enabling GitHub Pages.
+- [Live Demo](https://<your-github-username>.github.io/<repository-name>/) — enable GitHub Pages after pushing to view the deployed app.
+- **Note:** When opening the HTML file directly from disk (`file://`), OpenStreetMap tiles may be blocked by its usage policy. It's recommended to run a local static server (e.g., Live Server in VS Code) or deploy to GitHub Pages.
 
 ## APIs Used
 - **Leaflet.js + OpenStreetMap** — interactive map and tiles (no API key required).
