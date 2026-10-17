@@ -47,17 +47,16 @@ function initMap() {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
-    /* بلاط احتياطي إذا فشل المصدر الأساسي. */
-    tileLayer.on('tileerror', () => {
-      tileLayer.setUrl('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
-    });
+  /* بلاط احتياطي إذا فشل المصدر الأساسي. */
+  tileLayer.on('tileerror', () => {
+    tileLayer.setUrl('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
+  });
 
-    /* التأكد من render البلاط بعد قياس أبعاد الحاوية. */
-    setTimeout(() => map.invalidateSize(), 0);
-    window.addEventListener('load', () => map.invalidateSize());
-  } catch (err) {
-    showError('فشل تهيئة الخريطة: ' + escapeHtml(err.message));
-  }
+  /* التأكد من render البلاط بعد قياس أبعاد الحاوية. */
+  setTimeout(() => map.invalidateSize(), 0);
+  window.addEventListener('load', () => map.invalidateSize());
+  /* Ensure map renders correctly after resize */
+}
 }
 
 /* ---------- Loading state ---------- */
