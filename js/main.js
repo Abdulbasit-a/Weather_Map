@@ -75,18 +75,18 @@ function setLoading(isLoading) {
     getWeatherBtn.textContent = 'Get Weather';
   }
 }
+}
+
+function showError(message) {
   errorMessage.textContent = message;
   errorAlert.style.borderColor = '#fecaca';
   errorAlert.style.background = '#fef2f2';
   errorAlert.style.color = '#991b1b';
-  errorAlert.querySelector('.alert-icon').textContent = '\u26A0';
+  errorAlert.querySelector('.alert-icon').textContent = '\\u26A0';
   errorAlert.style.display = 'flex';
   errorAlert.setAttribute('aria-hidden', 'false');
 }
 
-function hideError() {
-  errorAlert.style.display = 'none';
-  errorAlert.setAttribute('aria-hidden', 'true');
 }
 
 let toastTimer = null;
