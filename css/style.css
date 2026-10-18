@@ -264,7 +264,7 @@ button {
   margin-top: 0.5rem;
 }
 
-
+/* ---------- Share buttons (Copy + Facebook) ---------- */
 .share-group {
   display: flex;
   gap: 0.5rem;
@@ -273,15 +273,18 @@ button {
 
 .share-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.55rem 0.75rem;
   background: #3b82f6;
   color: #ffffff;
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
-  font-family: inherit;
+  line-height: 1.2;
   text-align: center;
   text-decoration: none;
-  display: inline-block;
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -292,9 +295,13 @@ button {
   background: #2563eb;
 }
 
-.share-btn:hover,
-.share-facebook:hover {
-  background: #2563eb;
+/* Override Leaflet's default link color so the <a> matches the <button> */
+.weather-card a.share-btn,
+.leaflet-container a.share-btn,
+.leaflet-container a.share-btn:hover,
+.leaflet-container a.share-btn:visited {
+  color: #ffffff;
+  text-decoration: none;
 }
 
 /* ---------- Accessibility ---------- */

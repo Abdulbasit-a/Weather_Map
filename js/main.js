@@ -2,13 +2,15 @@
 
 /* ---------- Configuration ---------- */
 const CONFIG = {
-  openWeatherMapApiKey: 'ضع_مفتاح_API_الخاص_بك_هنا',
+  openWeatherMapApiKey: 'fbdd82c5e53ca4053e86a029363251eb',
   openWeatherMapBase: 'https://api.openweathermap.org/data/2.5/weather',
   nominatimBase: 'https://nominatim.openstreetmap.org/search',
   defaultLat: 15.5007,
   defaultLng: 32.5599,
   defaultZoom: 6
 };
+
+const PLACEHOLDER_KEY = 'YOUR_API_KEY';
 
 /* ---------- DOM references ---------- */
 const form = document.getElementById('weather-form');
@@ -52,6 +54,11 @@ function showError(message) {
   if (!errorAlert || !errorMessage) {
     console.error(message);
     return;
+  }
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
   }
 
   errorMessage.textContent = String(message);
@@ -193,12 +200,9 @@ async function geocodeLocation(query, signal) {
 
 /* ---------- Phase 3: Fetch current weather ---------- */
 async function fetchWeather(lat, lng, signal) {
-  const apiKey = CONFIG.openWeatherMapApiKey.trim();
+  const apiKey = (CONFIG.openWeatherMapApiKey || '').trim();
 
-  if (
-    !apiKey ||
-    apiKey === 'dfe09a79bcbb22cdf0435671eb238ac4'
-  ) {
+  if (!apiKey || apiKey === PLACEHOLDER_KEY) {
     throw new Error(
       'يرجى وضع مفتاح OpenWeatherMap API في إعدادات CONFIG.'
     );
@@ -404,10 +408,10 @@ function renderWeather(lat, lng, weather, placeName) {
     offset: [0, -16]
   })
     .setLatLng([lat, lng])
-    .setContent(popupContent)
-    .openOn(map);
+    .setContent(popupContent);
 
-  /* Attach the Copy event after the popup is added. */
+  /* Attach the Copy event BEFORE opening the popup,
+     otherwise the 'add' event fires before the listener exists. */
   popup.once('add', () => {
     const popupElement = popup.getElement();
 
@@ -419,34 +423,17 @@ function renderWeather(lat, lng, weather, placeName) {
 
     if (copyButton) {
       copyButton.addEventListener('click', () => {
-        handleShare(shareText);
+        copyToClipboard(shareText);
       });
     }
   });
 
+  popup.openOn(map);
+
   return popup;
 }
 
-/* ---------- Bonus: Share and copy weather ---------- */
-async function handleShare(text) {
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: 'WeatherMap',
-        text,
-        url: window.location.href
-      });
-
-      return;
-    } catch (err) {
-      /* Do not copy if the user cancelled sharing. */
-      if (err && err.name === 'AbortError') return;
-    }
-  }
-
-  await copyToClipboard(text);
-}
-
+/* ---------- Copy weather to clipboard ---------- */
 async function copyToClipboard(text) {
   try {
     if (
