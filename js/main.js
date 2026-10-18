@@ -63,8 +63,8 @@ function initMap() {
 
 /* Loading and error state helpers */
 function setLoading(isLoading) {
+/* Loading and error state helpers */
 function setLoading(isLoading) {
-  if (isLoading) {
     spinner.style.display = 'flex';
     getWeatherBtn.disabled = true;
     getWeatherBtn.textContent = 'Loading&hellip;';
