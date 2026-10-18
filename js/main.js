@@ -1,16 +1,13 @@
-/* WeatherMap - Behavior layer (Pure Vanilla JavaScript ES6+) */
-/* Strict separation of concerns: no inline handlers, no inline styles. */
+/* WeatherMap - JavaScript ES6+ */
 
 /* ---------- Configuration ---------- */
 const CONFIG = {
-  /* Get a free API key at https://home.openweathermap.org/api_keys and paste it here. */
-  openWeatherMapApiKey: 'fbdd82c5e53ca4053e86a029363251eb',
+  openWeatherMapApiKey: 'ضع_مفتاح_API_الخاص_بك_هنا',
   openWeatherMapBase: 'https://api.openweathermap.org/data/2.5/weather',
   nominatimBase: 'https://nominatim.openstreetmap.org/search',
   defaultLat: 15.5007,
   defaultLng: 32.5599,
-  defaultZoom: 6,
-  userAgent: 'WeatherMap-SPA/1.0 (educational project; contact: student@example.com)'
+  defaultZoom: 6
 };
 
 /* ---------- DOM references ---------- */
@@ -26,152 +23,239 @@ const mapContainer = document.getElementById('map');
 /* ---------- Map state ---------- */
 let map = null;
 let marker = null;
+let toastTimer = null;
+let requestController = null;
 
-/* ---------- Phase 1: Map init ---------- */
+/* ---------- Safe HTML helper ---------- */
+function escapeHtml(value) {
+  if (value == null) return '';
+
+  const div = document.createElement('div');
+  div.textContent = String(value);
+  return div.innerHTML;
+}
+
+/* ---------- Error and loading helpers ---------- */
+function hideError() {
+  if (!errorAlert) return;
+
+  errorAlert.style.display = 'none';
+  errorAlert.setAttribute('aria-hidden', 'true');
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+}
+
+function showError(message) {
+  if (!errorAlert || !errorMessage) {
+    console.error(message);
+    return;
+  }
+
+  errorMessage.textContent = String(message);
+  errorAlert.style.borderColor = '#fecaca';
+  errorAlert.style.background = '#fef2f2';
+  errorAlert.style.color = '#991b1b';
+
+  const icon = errorAlert.querySelector('.alert-icon');
+  if (icon) icon.textContent = '\u26A0';
+
+  errorAlert.style.display = 'flex';
+  errorAlert.setAttribute('aria-hidden', 'false');
+}
+
+function showToast(message) {
+  if (!errorAlert || !errorMessage) return;
+
+  if (toastTimer) clearTimeout(toastTimer);
+
+  errorMessage.textContent = String(message);
+  errorAlert.style.borderColor = '#bbf7d0';
+  errorAlert.style.background = '#ecfdf5';
+  errorAlert.style.color = '#166534';
+
+  const icon = errorAlert.querySelector('.alert-icon');
+  if (icon) icon.textContent = '\u2713';
+
+  errorAlert.style.display = 'flex';
+  errorAlert.setAttribute('aria-hidden', 'false');
+
+  toastTimer = setTimeout(hideError, 2500);
+}
+
+function setLoading(isLoading) {
+  if (spinner) {
+    spinner.style.display = isLoading ? 'flex' : 'none';
+  }
+
+  if (getWeatherBtn) {
+    getWeatherBtn.disabled = isLoading;
+    getWeatherBtn.textContent = isLoading
+      ? 'Loading…'
+      : 'Get Weather';
+  }
+
+  if (isLoading) hideError();
+}
+
+/* ---------- Phase 1: Initialize map ---------- */
 function initMap() {
+  if (!mapContainer) {
+    showError('لم يتم العثور على عنصر الخريطة #map في ملف HTML.');
+    return;
+  }
+
   if (typeof L === 'undefined') {
-    showError('فشل تحميل مكتبة Leaflet. يرجى التحقق من اتصالك بالإنترنت وإعادة تحميل الصفحة.');
+    showError(
+      'تعذر تحميل Leaflet. تحقق من الإنترنت وروابط المكتبة في HTML.'
+    );
     return;
   }
 
   try {
-    map = L.map('map', {
+    map = L.map(mapContainer, {
       center: [CONFIG.defaultLat, CONFIG.defaultLng],
       zoom: CONFIG.defaultZoom,
       zoomControl: true
     });
 
-  /* بلاط OpenStreetMap (المصدر الأساسي للمواصفات). */
-  const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+    L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }
+    ).addTo(map);
 
-  /* بلاط احتياطي إذا فشل المصدر الأساسي. */
-  tileLayer.on('tileerror', () => {
-    tileLayer.setUrl('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
-  });
+    requestAnimationFrame(() => {
+      if (map) map.invalidateSize();
+    });
 
-  /* التأكد من render البلاط بعد قياس أبعاد الحاوية. */
-  setTimeout(() => map.invalidateSize(), 0);
-  window.addEventListener('load', () => map.invalidateSize());
-  /* Ensure map renders correctly after resize */
+    window.addEventListener('resize', () => {
+      if (map) map.invalidateSize();
+    });
+
   } catch (err) {
-    showError('فشل تهيئة الخريطة: ' + escapeHtml(err.message));
+    showError('فشل تهيئة الخريطة: ' + err.message);
+    console.error(err);
   }
 }
 
-/* Loading and error state helpers */
-/* Loading and error state helpers */
-function setLoading(isLoading) {
-  if (isLoading) {
-    spinner.style.display = 'flex';
-    getWeatherBtn.disabled = true;
-    getWeatherBtn.textContent = 'Loading&hellip;';
-    hideError();
-  } else {
-    spinner.style.display = 'none';
-    getWeatherBtn.disabled = false;
-    getWeatherBtn.textContent = 'Get Weather';
-  }
-}
-
-
-function showError(message) {
-  errorMessage.textContent = message;
-  errorAlert.style.borderColor = '#fecaca';
-  errorAlert.style.background = '#fef2f2';
-  errorAlert.style.color = '#991b1b';
-  errorAlert.querySelector('.alert-icon').textContent = '\\u26A0';
-  errorAlert.style.display = 'flex';
-  errorAlert.setAttribute('aria-hidden', 'false');
-}
-
-}
-
-let toastTimer = null;
-function showToast(message) {
-  if (toastTimer) clearTimeout(toastTimer);
-  errorMessage.textContent = message;
-  errorAlert.style.borderColor = '#bbf7d0';
-  errorAlert.style.background = '#ecfdf5';
-  errorAlert.style.color = '#166534';
-  errorAlert.querySelector('.alert-icon').textContent = '\u2713';
-  errorAlert.style.display = 'flex';
-  errorAlert.setAttribute('aria-hidden', 'false');
-  toastTimer = setTimeout(hideError, 2500);
-}
-
-/* ---------- XSS-safe HTML injection ---------- */
-function escapeHtml(text) {
-  if (text == null) return '';
-  const div = document.createElement('div');
-  div.textContent = String(text);
-  return div.innerHTML;
-}
-
-/* ---------- Phase 2: Geocoding (Nominatim / OpenStreetMap) ---------- */
-async function geocodeLocation(query) {
+/* ---------- Phase 2: Geocoding ---------- */
+async function geocodeLocation(query, signal) {
   const params = new URLSearchParams({
     q: query,
-    format: 'json',
-    limit: 1,
+    format: 'jsonv2',
+    limit: '1',
     'accept-language': 'en'
   });
-  const url = `${CONFIG.nominatimBase}?${params.toString()}`;
-  const response = await fetch(url, {
-    headers: { 'User-Agent': CONFIG.userAgent }
-  });
+
+  const response = await fetch(
+    `${CONFIG.nominatimBase}?${params.toString()}`,
+    {
+      signal,
+      headers: {
+        Accept: 'application/json'
+      }
+    }
+  );
+
   if (!response.ok) {
-    throw new Error(`Geocoding service error (${response.status})`);
+    throw new Error(
+      `خطأ في خدمة تحديد الموقع (${response.status}).`
+    );
   }
+
   const data = await response.json();
-  if (!data || data.length === 0) {
-    throw new Error('Location not found. Please try a different city or place.');
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(
+      'لم يتم العثور على الموقع. جرّب اسم مدينة أو مكان آخر.'
+    );
   }
-  const { lat, lon, display_name } = data[0];
+
+  const lat = Number.parseFloat(data[0].lat);
+  const lng = Number.parseFloat(data[0].lon);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('إحداثيات الموقع غير صالحة.');
+  }
+
   return {
-    lat: parseFloat(lat),
-    lng: parseFloat(lon),
-    name: display_name
+    lat,
+    lng,
+    name: data[0].display_name || query
   };
 }
 
-/* ---------- Phase 3: OpenWeatherMap current weather ---------- */
-async function fetchWeather(lat, lng) {
-  if (!CONFIG.openWeatherMapApiKey) {
+/* ---------- Phase 3: Fetch current weather ---------- */
+async function fetchWeather(lat, lng, signal) {
+  const apiKey = CONFIG.openWeatherMapApiKey.trim();
+
+  if (
+    !apiKey ||
+    apiKey === 'dfe09a79bcbb22cdf0435671eb238ac4'
+  ) {
     throw new Error(
-      'OpenWeatherMap API key is not configured. ' +
-      'Get a free key at https://home.openweathermap.org/api_keys and set CONFIG.openWeatherMapApiKey in js/main.js.'
+      'يرجى وضع مفتاح OpenWeatherMap API في إعدادات CONFIG.'
     );
   }
+
   const params = new URLSearchParams({
     lat: String(lat),
     lon: String(lng),
-    appid: CONFIG.openWeatherMapApiKey,
+    appid: apiKey,
     units: 'metric'
   });
-  const url = `${CONFIG.openWeatherMapBase}?${params.toString()}`;
-  const response = await fetch(url);
+
+  const response = await fetch(
+    `${CONFIG.openWeatherMapBase}?${params.toString()}`,
+    { signal }
+  );
+
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('Invalid OpenWeatherMap API key.');
+      throw new Error(
+        'مفتاح OpenWeatherMap غير صالح أو لم يتم تفعيله.'
+      );
     }
+
     if (response.status === 404) {
-      throw new Error('Weather data not found for this location.');
+      throw new Error(
+        'لم يتم العثور على بيانات الطقس لهذا الموقع.'
+      );
     }
+
     if (response.status === 429) {
-      throw new Error('API rate limit reached. Please wait a moment and try again.');
+      throw new Error(
+        'تم تجاوز حد الطلبات. انتظر قليلًا ثم حاول مجددًا.'
+      );
     }
-    throw new Error(`Weather service error (${response.status})`);
+
+    throw new Error(
+      `خطأ في خدمة الطقس (${response.status}).`
+    );
   }
+
   return await response.json();
 }
 
-/* ---------- Phase 4 & 5: Map center, marker, InfoWindow ---------- */
+/* ---------- Phase 4 & 5: Render weather on map ---------- */
 function renderWeather(lat, lng, weather, placeName) {
-  /* Phase 4: Smoothly center the map and place/refresh the marker. */
-  map.setView([lat, lng], 10, { animate: true, duration: 1 });
+  if (!map) {
+    throw new Error(
+      'الخريطة غير جاهزة. تحقق من تحميل Leaflet.'
+    );
+  }
+
+  map.setView([lat, lng], 10, {
+    animate: true,
+    duration: 1
+  });
+
   map.invalidateSize();
 
   if (marker) {
@@ -179,136 +263,330 @@ function renderWeather(lat, lng, weather, placeName) {
     marker = null;
   }
 
-  const iconCode = weather.weather && weather.weather[0] ? weather.weather[0].icon : '01d';
-  const weatherDesc = escapeHtml(weather.weather && weather.weather[0] ? weather.weather[0].description : 'Clear');
-  const temp = weather.main && weather.main.temp !== undefined ? Math.round(weather.main.temp) : '—';
-  const cityName = escapeHtml(placeName || (weather.name ? weather.name : 'Unknown location'));
-  const country = weather.sys && weather.sys.country ? escapeHtml(weather.sys.country) : '';
-  const clouds = weather.clouds && weather.clouds.all !== undefined ? weather.clouds.all : '—';
-  const humidity = weather.main && weather.main.humidity !== undefined ? weather.main.humidity : '—';
-  const wind = weather.wind && weather.wind.speed !== undefined ? weather.wind.speed : '—';
+  const weatherInfo =
+    weather.weather && weather.weather[0]
+      ? weather.weather[0]
+      : {};
 
-  const iconUrl = `https://openweathermap.org/img/wn/${escapeHtml(iconCode)}@2x.png`;
+  const iconCode = weatherInfo.icon || '01d';
+  const weatherDesc = escapeHtml(
+    weatherInfo.description || 'Clear'
+  );
 
-  const shareText = `Weather in ${cityName}${country ? ', ' + country : ''}: ${temp}\u00B0C, ${weatherDesc}. Humidity ${humidity}%, Wind ${wind} m/s, Clouds ${clouds}%.`;
-  const fbUrl = 'https://www.facebook.com/sharer/sharer.php?u=' +
-    encodeURIComponent(window.location.href) + '&quote=' + encodeURIComponent(shareText);
+  const temp =
+    weather.main && Number.isFinite(weather.main.temp)
+      ? Math.round(weather.main.temp)
+      : '—';
 
+  const cityName = escapeHtml(
+    placeName || weather.name || 'Unknown location'
+  );
+
+  const country = escapeHtml(
+    weather.sys && weather.sys.country
+      ? weather.sys.country
+      : ''
+  );
+
+  const clouds =
+    weather.clouds && weather.clouds.all != null
+      ? weather.clouds.all
+      : '—';
+
+  const humidity =
+    weather.main && weather.main.humidity != null
+      ? weather.main.humidity
+      : '—';
+
+  const wind =
+    weather.wind && weather.wind.speed != null
+      ? weather.wind.speed
+      : '—';
+
+  const iconUrl =
+    `https://openweathermap.org/img/wn/${encodeURIComponent(iconCode)}@2x.png`;
+
+  const shareText =
+    `Weather in ${cityName}` +
+    `${country ? ', ' + country : ''}: ` +
+    `${temp}°C, ${weatherDesc}. ` +
+    `Humidity ${humidity}%, Wind ${wind} m/s, ` +
+    `Clouds ${clouds}%.`;
+
+  const facebookUrl =
+    'https://www.facebook.com/sharer/sharer.php?u=' +
+    encodeURIComponent(window.location.href) +
+    '&quote=' +
+    encodeURIComponent(shareText);
+
+  /* Create the map marker without inline styles. */
   const markerIcon = L.divIcon({
     className: 'weather-marker',
-    html: '<div style="font-size:26px;line-height:26px;">\uD83C\uDF24\uFE0F</div>',
+    html:
+      '<div class="weather-marker-emoji" ' +
+      'aria-hidden="true">🌤️</div>',
     iconSize: [32, 32],
     iconAnchor: [16, 32]
   });
 
-  marker = L.marker([lat, lng], { icon: markerIcon, title: cityName }).addTo(map);
+  marker = L.marker([lat, lng], {
+    icon: markerIcon,
+    title: placeName || weather.name || 'Weather location'
+  }).addTo(map);
 
+  /* Build the weather popup. */
   const popupContent = `
     <div class="weather-card">
-      <div class="city">${cityName}${country ? `<span style="font-weight:400;font-size:0.9rem;color:#64748b;margin-left:0.4rem;">, ${country}</span>` : ''}</div>
+      <div class="city">
+        ${cityName}
+        ${
+          country
+            ? `<span class="country-name">, ${country}</span>`
+            : ''
+        }
+      </div>
+
       <div class="weather-row">
-        <img src="${iconUrl}" alt="${weatherDesc}" class="icon-img" width="48" height="48">
+        <img
+          src="${iconUrl}"
+          alt="${weatherDesc}"
+          class="icon-img"
+          width="48"
+          height="48"
+        >
+
         <div>
-          <div class="temp">${temp}\u00B0C</div>
-          <div style="color:#64748b;font-size:0.95rem;text-transform:capitalize;">${weatherDesc}</div>
+          <div class="temp">${temp}°C</div>
+          <div class="weather-description">
+            ${weatherDesc}
+          </div>
         </div>
       </div>
-      <div class="detail"><span>Clouds</span><span>${clouds}%</span></div>
-      <div class="detail"><span>Humidity</span><span>${humidity}%</span></div>
-      <div class="detail"><span>Wind</span><span>${wind} m/s</span></div>
+
+      <div class="detail">
+        <span>Clouds</span>
+        <span>${clouds}%</span>
+      </div>
+
+      <div class="detail">
+        <span>Humidity</span>
+        <span>${humidity}%</span>
+      </div>
+
+      <div class="detail">
+        <span>Wind</span>
+        <span>${wind} m/s</span>
+      </div>
+
       <div class="share-group">
-        <button type="button" class="share-btn" id="share-btn">Copy</button>
-        <a href="${fbUrl}" target="_blank" rel="noopener" class="share-btn">Facebook</a>
+        <button
+          type="button"
+          class="share-btn"
+          data-action="copy-weather"
+        >
+          Copy
+        </button>
+
+        <a
+          href="${facebookUrl}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="share-btn"
+        >
+          Facebook
+        </a>
       </div>
     </div>
   `;
 
-  const popup = L.popup({ className: 'weather-popup', offset: [0, -16] })
+  const popup = L.popup({
+    className: 'weather-popup',
+    offset: [0, -16]
+  })
     .setLatLng([lat, lng])
     .setContent(popupContent)
     .openOn(map);
 
-  /* Wire up the Share button after the popup is attached to the DOM. */
-  setTimeout(() => {
-    const btn = document.getElementById('share-btn');
-    if (btn) {
-      btn.addEventListener('click', (event) => {
-        event.preventDefault();
+  /* Attach the Copy event after the popup is added. */
+  popup.once('add', () => {
+    const popupElement = popup.getElement();
+
+    const copyButton = popupElement
+      ? popupElement.querySelector(
+          '[data-action="copy-weather"]'
+        )
+      : null;
+
+    if (copyButton) {
+      copyButton.addEventListener('click', () => {
         handleShare(shareText);
       });
     }
-  }, 0);
+  });
 
   return popup;
 }
 
-/* ---------- Bonus: Share feature (Clipboard / Web Share API / Facebook) ---------- */
-function handleShare(text) {
+/* ---------- Bonus: Share and copy weather ---------- */
+async function handleShare(text) {
   if (navigator.share) {
-    navigator.share({ title: 'WeatherMap', text, url: window.location.href })
-      .catch(() => copyToClipboard(text));
-  } else {
-    copyToClipboard(text);
+    try {
+      await navigator.share({
+        title: 'WeatherMap',
+        text,
+        url: window.location.href
+      });
+
+      return;
+    } catch (err) {
+      /* Do not copy if the user cancelled sharing. */
+      if (err && err.name === 'AbortError') return;
+    }
   }
+
+  await copyToClipboard(text);
 }
 
 async function copyToClipboard(text) {
   try {
-    await navigator.clipboard.writeText(text);
-    showToast('Copied to clipboard!');
+    if (
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      await navigator.clipboard.writeText(text);
+      showToast('Copied to clipboard!');
+      return;
+    }
+
+    throw new Error('Clipboard API unavailable');
   } catch (err) {
     const textarea = document.createElement('textarea');
+
     textarea.value = text;
-    textarea.setAttribute('readonly', true);
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
+    textarea.setAttribute('readonly', '');
+    textarea.className = 'clipboard-fallback';
+
     document.body.appendChild(textarea);
     textarea.select();
+
+    let copied = false;
+
     try {
-      document.execCommand('copy');
-      showToast('Copied to clipboard!');
-    } catch {
-      showError('Unable to copy. Share manually: ' + text);
+      copied = document.execCommand('copy');
+    } catch (_) {
+      copied = false;
     }
-    document.body.removeChild(textarea);
+
+    textarea.remove();
+
+    if (copied) {
+      showToast('Copied to clipboard!');
+    } else {
+      showError(
+        'تعذر النسخ تلقائيًا. انسخ النص يدويًا: ' + text
+      );
+    }
   }
 }
 
-/* ---------- Orchestration: Phases 2-5 ---------- */
+/* ---------- Search orchestration ---------- */
 async function handleFormSubmit(event) {
   event.preventDefault();
 
+  if (!locationInput) {
+    showError(
+      'لم يتم العثور على حقل البحث #location-input في HTML.'
+    );
+    return;
+  }
+
   const query = locationInput.value.trim();
+
   if (!query) {
     showError('Please enter a city, address, or place.');
     locationInput.focus();
     return;
   }
 
-  hideError();
+  /* Cancel any previous search. */
+  if (requestController) {
+    requestController.abort();
+  }
+
+  requestController = new AbortController();
+
+  const controller = requestController;
+  const signal = controller.signal;
+
   setLoading(true);
 
   try {
-    const geo = await geocodeLocation(query);       /* Phase 2 */
-    const weather = await fetchWeather(geo.lat, geo.lng); /* Phase 3 */
-    renderWeather(geo.lat, geo.lng, weather, geo.name);   /* Phases 4 & 5 */
+    /* Phase 2: Find the location coordinates. */
+    const geo = await geocodeLocation(query, signal);
+
+    /* Phase 3: Retrieve current weather. */
+    const weather = await fetchWeather(
+      geo.lat,
+      geo.lng,
+      signal
+    );
+
+    /* Phases 4 and 5: Update the map and popup. */
+    renderWeather(
+      geo.lat,
+      geo.lng,
+      weather,
+      geo.name
+    );
+
   } catch (err) {
-    showError(err.message || 'Something went wrong. Please try again.');
+    if (err && err.name === 'AbortError') {
+      return;
+    }
+
+    showError(
+      err && err.message
+        ? err.message
+        : 'حدث خطأ غير متوقع. حاول مرة أخرى.'
+    );
+
+    console.error(err);
+
   } finally {
-    setLoading(false);
+    /* Do not reset loading for a newer request. */
+    if (requestController === controller) {
+      requestController = null;
+      setLoading(false);
+    }
   }
 }
 
-/* ---------- Programmatic event listener registration ---------- */
-form.addEventListener('submit', handleFormSubmit);
+/* ---------- Register event listeners ---------- */
+if (form) {
+  form.addEventListener(
+    'submit',
+    handleFormSubmit
+  );
+} else {
+  showError(
+    'لم يتم العثور على نموذج البحث #weather-form في HTML.'
+  );
+}
 
-closeAlert.addEventListener('click', () => {
-  hideError();
-});
+if (closeAlert) {
+  closeAlert.addEventListener(
+    'click',
+    hideError
+  );
+}
 
-/* ---------- Initialize map once the DOM is ready ---------- */
+/* ---------- Initialize the map ---------- */
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initMap);
+  document.addEventListener(
+    'DOMContentLoaded',
+    initMap,
+    { once: true }
+  );
 } else {
   initMap();
 }
